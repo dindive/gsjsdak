@@ -53,7 +53,7 @@ mqttClient.on("message", (topic, message) => {
   } else if (topic === topics.motion) {
     db.set("sensors.motion", payload.motion).write();
   } else if (topic === topics.current) {
-    db.set("sensors.current", payload.value).write();
+    db.set("sensors.current", payload.current).write();
   }
 });
 
