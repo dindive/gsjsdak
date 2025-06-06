@@ -1,1 +1,11 @@
-{}
+{
+  "sensors": {
+    "light": 0,
+    "motion": false,
+    "current": 0
+  },
+  "actuators": {
+    "light": "off",
+    "socket": "off"
+  }
+}

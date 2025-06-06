@@ -10,18 +10,15 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// Setup LowDB
+// Setup LowDB with FileSync
 const adapter = new FileSync("db.json");
 const db = low(adapter);
 
-(async () => {
-  await db.read();
-  db.data ||= {
-    sensors: { light: 0, motion: false, current: 0 },
-    actuators: { light: "off", socket: "off" },
-  };
-  await db.write();
-})();
+// Set default database structure if not exists
+db.defaults({
+  sensors: { light: 0, motion: false, current: 0 },
+  actuators: { light: "off", socket: "off" },
+}).write();
 
 // MQTT Configuration
 const mqttOptions = {
@@ -44,40 +41,38 @@ const topics = {
 };
 
 mqttClient.on("connect", () => {
-  console.log("MQTT connected");
+  console.log("✅ MQTT connected");
   mqttClient.subscribe([topics.light, topics.motion, topics.current]);
 });
 
-mqttClient.on("message", async (topic, message) => {
+mqttClient.on("message", (topic, message) => {
   const payload = JSON.parse(message.toString());
 
-  await db.read();
   if (topic === topics.light) {
-    db.data.sensors.light = payload.value;
+    db.set("sensors.light", payload.value).write();
   } else if (topic === topics.motion) {
-    db.data.sensors.motion = payload.motion;
+    db.set("sensors.motion", payload.motion).write();
   } else if (topic === topics.current) {
-    db.data.sensors.current = payload.value;
+    db.set("sensors.current", payload.value).write();
   }
-  await db.write();
 });
 
 // REST Endpoints
 
 // Get all sensor values
-app.get("/api/sensors", async (req, res) => {
-  await db.read();
-  res.json(db.data.sensors);
+app.get("/api/sensors", (req, res) => {
+  const sensors = db.get("sensors").value();
+  res.json(sensors);
 });
 
 // Get actuator states
-app.get("/api/actuators", async (req, res) => {
-  await db.read();
-  res.json(db.data.actuators);
+app.get("/api/actuators", (req, res) => {
+  const actuators = db.get("actuators").value();
+  res.json(actuators);
 });
 
 // Set actuator state
-app.post("/api/actuators/:device", async (req, res) => {
+app.post("/api/actuators/:device", (req, res) => {
   const device = req.params.device;
   const command = req.body.command;
 
@@ -93,20 +88,18 @@ app.post("/api/actuators/:device", async (req, res) => {
   mqttClient.publish(topic, JSON.stringify({ command }));
 
   // Update DB
-  await db.read();
-  db.data.actuators[device] = command;
-  await db.write();
+  db.set(`actuators.${device}`, command).write();
 
   res.json({ success: true });
 });
 
 // Health check
 app.get("/", (req, res) => {
-  res.send("ESP8266 Backend is running...");
+  res.send("🚀 ESP8266 Backend is running...");
 });
 
 // Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Backend running on http://localhost:${PORT}`);
+  console.log(`🌐 Backend running on http://localhost:${PORT}`);
 });
